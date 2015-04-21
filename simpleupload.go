@@ -41,8 +41,13 @@ func cleanName(src string) string {
 }
 
 func landingPageHandler(w http.ResponseWriter, r *http.Request) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		logAndWrite(w, "Error parsing remote address - %s - %v", r.RemoteAddr, err)
+	}
+	srcIP := net.ParseIP(host)
 	tmpl := template.Must(template.ParseFiles("template.html"))
-	err := tmpl.Execute(w, nil)
+	err = tmpl.Execute(w, getTransferStatus(srcIP))
 	if err != nil {
 		panic(err)
 	}
@@ -52,7 +57,7 @@ func uploadRawFileHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	vars := mux.Vars(r)
 	filename := vars["filename"]
-	uploadHandler(w, filename, r.Body, r.RemoteAddr)
+	uploadHandler(w, r, filename, r.Body)
 }
 
 func uploadMultipartFileHandler(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +77,7 @@ func uploadMultipartFileHandler(w http.ResponseWriter, r *http.Request) {
 		if part.FileName() == "" {
 			continue
 		}
-		uploadHandler(w, part.FileName(), part, r.RemoteAddr)
+		uploadHandler(w, r, part.FileName(), part)
 		fmt.Fprintln(w)
 	}
 }
@@ -82,10 +87,10 @@ func logAndWrite(w http.ResponseWriter, format string, params ...interface{}) {
 	log.Printf(format, params...)
 }
 
-func uploadHandler(w http.ResponseWriter, filename string, in io.Reader, src string) {
-	host, _, err := net.SplitHostPort(src)
+func uploadHandler(w http.ResponseWriter, r *http.Request, filename string, in io.Reader) {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		logAndWrite(w, "Error parsing remote address - %s - %v", src, err)
+		logAndWrite(w, "Error parsing remote address - %s - %v", r.RemoteAddr, err)
 	}
 	srcIP := net.ParseIP(host)
 	dateName := time.Now().Format("2006-01-02_15-04-05")
@@ -142,6 +147,7 @@ func uploadHandler(w http.ResponseWriter, filename string, in io.Reader, src str
 	}
 	outBuf.Flush()
 	ts.End = time.Now()
+	http.Redirect(w, r, "/", http.StatusFound)
 	logAndWrite(w, "File uploaded successfully : %s", name)
 	logAndWrite(w, "Transfer stats : %s", ts)
 	for i := range hashNames {
@@ -158,6 +164,7 @@ var keyPath = flag.String("key", "tmp.key", "The file name of the certificate's 
 var address = flag.String("address", ":5050", "The address:port to listen on, leave address blank for all interfaces")
 
 func init() {
+	flag.Parse()
 	r := mux.NewRouter()
 	r.HandleFunc("/upload/{filename}", uploadRawFileHandler)
 	r.HandleFunc("/upload", uploadMultipartFileHandler)
@@ -233,15 +240,26 @@ type TransferStatus struct {
 	Hashes   []string
 }
 
-func (ts TransferStatus) String() string {
-	var result bytes.Buffer
-	stillgoing := ts.End.IsZero()
-	if stillgoing {
+func (ts TransferStatus) HumanSize() string {
+	return bytefmt.ByteSize(ts.Size)
+}
+
+func (ts TransferStatus) Speed() string {
+	if ts.End.IsZero() {
 		ts.End = time.Now() // act like it's finished
 	}
 	duration := ts.End.Sub(ts.Start)
 	bytesPerSecond := ts.Size * 1000000000 / uint64(duration.Nanoseconds())
-	result.WriteString(fmt.Sprintf("%d - done=%t, %s %s in %s for speed of %s/s", ts.Index, !stillgoing, ts.Filename, bytefmt.ByteSize(ts.Size), duration, bytefmt.ByteSize(bytesPerSecond)))
+	return bytefmt.ByteSize(bytesPerSecond)
+}
+
+func (ts TransferStatus) String() string {
+	var result bytes.Buffer
+	if ts.End.IsZero() {
+		ts.End = time.Now() // act like it's finished
+	}
+	duration := ts.End.Sub(ts.Start)
+	result.WriteString(fmt.Sprintf("%d - done=%t, %s %s in %s for speed of %s/s", ts.Index, !ts.End.IsZero(), ts.Filename, ts.HumanSize(), duration, ts.Speed()))
 	for _, l := range ts.Hashes {
 		result.WriteString("\n")
 		result.WriteString(l)

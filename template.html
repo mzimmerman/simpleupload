@@ -1,7 +1,32 @@
 <html>
 	<title>Uploader</title>
 	<body>
-		<a target="_blank" href="/status">Status Page</a><br />
+		<h1>Simple Uploader</h1>
+		<p>Simple uploader receives files through https and returns a transfer status page as well as various hash values of files received.</p>
+		<p>Refresh this page to see the current status of any transfers from your IP</p>
+		<p>Note: If you're using this form's upload capability in your browser, refreshing the page will cancel your upload so open this page in a <a href="/" target="_blank">new window.</a></p>
+		<table>
+			<tbody>
+				<tr><th>ID</th><th>Done</th><th>Filename</th><th>Size</th><th>Speed</th><th>Hashes</th></tr>
+				{{range .}}
+					<tr>
+						<td>{{.Index}}</td>
+						<td>{{if .End.IsZero}}No{{else}}Yes{{end}}</td>
+						<td>{{.Filename}}</td>
+						<td>{{.HumanSize}}</td>
+						<td>{{.Speed}}</td>
+						<td>{{with .Hashes}}
+								<ul>
+									{{range .}}
+										<li>{{.}}</li>
+									{{end}}
+								</ul>
+							{{end}}
+						</td>
+					</tr>
+				{{end}}
+			</tbody>
+		</table>
 		<form action="/upload" method="post" enctype="multipart/form-data">
 			<label for="file">Filename:</label>
 			<input type="file" name="file" id="file">

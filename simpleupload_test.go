@@ -53,14 +53,13 @@ func TestUpload(t *testing.T) {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		client := &http.Client{Transport: tr}
-		resp, err := client.Do(nfu)
+		resp, err := tr.RoundTrip(nfu)
 		if err != nil {
 			t.Errorf("Error with POST request - %s", err)
 			continue
 		}
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected %d, not %d", http.StatusOK, resp.StatusCode)
+		if resp.StatusCode != http.StatusFound {
+			t.Errorf("Expected %d, not %d", http.StatusFound, resp.StatusCode)
 		}
 		cont, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
