@@ -79,7 +79,7 @@ func TestUpload(t *testing.T) {
 				t.Errorf("Output from upload did not display the proper number of hashes")
 				continue
 			}
-			if g, w := splt[x+1], f.hashes[x]; w != g {
+			if g, w := splt[x+2], f.hashes[x]; w != g {
 				t.Errorf("Wanted %s, got %s", w, g)
 			}
 		}
