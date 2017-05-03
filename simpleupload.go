@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/pivotal-golang/bytefmt"
+	"code.cloudfoundry.org/bytefmt"
 )
 
 var transferCount uint64
